@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DermaWeave | Medical-Grade Inclusive Fashion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
+        @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+        .scanline { animation: scan 2s ease-in-out infinite; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- MOCK BACKEND DATA & LOGIC ---
+        const LOGO_URL = "https://z-cdn-media.chatglm.cn/files/a5a6d772-5170-4478-8fb0-79129bd11652.png?auth_key=1883746313-c0d6481ddf70483493578e6710bd3e00-0-398251a9f79cbeb47aa0b188f99306e2";
+
+        const mockCatalog = [
+            { id: 1, name: "Classic Cotton Tee", gender: "unisex", price: 35, fabric: "100% Organic Cotton", irritation_index: 15, tags: ["breathable", "seamless"], image_url: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80" },
+            { id: 2, name: "Pure Silk Blouse", gender: "female", price: 89, fabric: "Mulberry Silk", irritation_index: 8, tags: ["breathable", "formal"], image_url: "https://images.unsplash.com/photo-1551048632-24e444b48a3e?w=400&q=80" },
+            { id: 3, name: "Heavy Wool Sweater", gender: "unisex", price: 120, fabric: "Lambswool", irritation_index: 92, tags: ["winter", "textured"], image_url: "https://images.unsplash.com/photo-1577900232427-18219b9166a0?w=400&q=80" },
+            { id: 4, name: "Linen Summer Dress", gender: "female", price: 75, fabric: "Belgian Linen", irritation_index: 25, tags: ["breathable", "formal"], image_url: "https://images.unsplash.com/photo-1583846783214-7229a91b20ed?w=400&q=80" },
+            { id: 5, name: "Synthetic Blend Hoodie", gender: "unisex", price: 65, fabric: "Polyester/Nylon", irritation_index: 78, tags: ["winter", "synthetics"], image_url: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&q=80" },
+            { id: 6, name: "Bamboo Pajama Set", gender: "female", price: 95, fabric: "Bamboo Viscose", irritation_index: 12, tags: ["seamless", "sleep"], image_url: "https://images.unsplash.com/photo-1571945153237-4929e783af4a?w=400&q=80" },
+            { id: 7, name: "Bamboo Loungewear Tee", gender: "male", price: 45, fabric: "Bamboo Viscose", irritation_index: 12, tags: ["seamless", "sleep"], image_url: "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400&q=80" },
+            { id: 8, name: "Cashmere Crewneck", gender: "male", price: 150, fabric: "Synthetic Cashmere Blend", irritation_index: 65, tags: ["winter", "formal"], image_url: "https://images.unsplash.com/photo-1611312449412-6cefac5dc3e4?w=400&q=80" }
+        ];
+
+        const mockAnalyzeSkinAPI = () => {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const isMale = Math.random() > 0.5;
+                    resolve({
+                        redness: Math.floor(Math.random() * (90 - 70) + 70),
+                        texture: Math.floor(Math.random() * (85 - 65) + 65),
+                        svs: Math.floor(Math.random() * (90 - 75) + 75),
+                        isHighlyReactive: true,
+                        gender: isMale ? 'male' : 'female'
+                    });
+                }, 2000);
+            });
+        };
+
+        // --- ICONS ---
+        const Icon = ({ path, className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{ __html: path }} />);
+        const paths = {
+            shield: "<path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='m9 12 2 2 4-4'/>",
+            scan: "<path d='M3 7V5a2 2 0 0 1 2-2h2'/><path d='M17 3h2a2 2 0 0 1 2 2v2'/><path d='M21 17v2a2 2 0 0 1-2 2h-2'/><path d='M7 21H5a2 2 0 0 1-2-2v-2'/><path d='M7 12h10'/>",
+            camera: "<path d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/><circle cx='12' cy='13' r='3'/>",
+            upload: "<path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><polyline points='17 8 12 3 7 8'/><line x1='12' x2='12' y1='3' y2='15'/>",
+            loader: "<line x1='12' x2='12' y1='2' y2='6'/><line x1='12' x2='12' y1='18' y2='22'/><line x1='4.93' x2='7.76' y1='4.93' y2='7.76'/><line x1='16.24' x2='19.07' y1='16.24' y2='19.07'/><line x1='2' x2='6' y1='12' y2='12'/><line x1='18' x2='22' y1='12' y2='12'/><line x1='4.93' x2='7.76' y1='19.07' y2='16.24'/><line x1='16.24' x2='19.07' y1='7.76' y2='4.93'/>",
+            lock: "<rect width='18' height='11' x='3' y='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/>",
+            check: "<path d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/><polyline points='22 4 12 14.01 9 11.01'/>",
+            brain: "<path d='M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z'/><path d='M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z'/>",
+            cart: "<circle cx='8' cy='21' r='1'/><circle cx='19' cy='21' r='1'/><path d='M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12'/>",
+            heart: "<path d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/>",
+            arrowLeft: "<line x1='19' x2='5' y1='12' y2='12'/><polyline points='12 19 5 12 12 5'/>",
+            x: "<line x1='18' x2='6' y1='6' y2='18'/><line x1='6' x2='18' y1='6' y2='18'/>",
+            pill: "<path d='m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z'/><path d='m8.5 8.5 7 7'/>",
+            sparkles: "<path d='m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z'/>",
+            image: "<rect width='18' height='18' x='3' y='3' rx='2' ry='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/>",
+            grid: "<rect width='7' height='7' x='3' y='3' rx='1'/><rect width='7' height='7' x='14' y='3' rx='1'/><rect width='7' height='7' x='14' y='14' rx='1'/><rect width='7' height='7' x='3' y='14' rx='1'/>"
+        };
+
+        // --- NAVBAR ---
+        const Navbar = ({ goTo, cartCount, currentPage }) => (
+            <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-20">
+                    <button onClick={() => goTo('landing')} className="flex items-center gap-2 cursor-pointer">
+                        <img src={LOGO_URL} alt="DermaWeave Logo" className="h-12 w-auto object-contain" 
+                             onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class=\'h-12 w-12 bg-emerald-700 rounded-lg flex items-center justify-center text-white font-bold text-xl\'>DW</div><span class="text-xl font-bold text-slate-800">DermaWeave</span>'; }} 
+                        />
+                    </button>
+                    <div className="flex items-center gap-6">
+                        <button onClick={() => goTo('shop')} className={`text-sm font-medium ${currentPage === 'shop' ? 'text-emerald-700' : 'text-slate-600 hover:text-slate-900'}`}>Shop</button>
+                        <button onClick={() => goTo('deconstruct')} className={`text-sm font-medium ${currentPage === 'deconstruct' ? 'text-emerald-700' : 'text-slate-600 hover:text-slate-900'}`}>Inspo AI</button>
+                        <button onClick={() => goTo('scan')} className={`text-sm font-medium ${currentPage === 'scan' ? 'text-emerald-700' : 'text-slate-600 hover:text-slate-900'}`}>Skin AI</button>
+                        <button onClick={() => goTo('cart')} className="relative p-2 text-slate-600 hover:text-slate-900">
+                            <Icon path={paths.cart} className="w-6 h-6" />
+                            {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-emerald-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{cartCount}</span>}
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        );
+
+        // --- LANDING PAGE ---
+        const LandingPage = ({ goTo }) => (
+            <main className="min-h-[calc(100vh-5rem)] flex flex-col items-center justify-center p-8 text-center fade-in">
+                <div className="mb-8 p-4 bg-emerald-50 rounded-full">
+                    <Icon path={paths.sparkles} className="w-12 h-12 text-emerald-700" />
+                </div>
+                <h1 className="text-4xl md:text-6xl font-bold text-slate-800 mb-4 tracking-tight">Medical-Grade Inclusive Fashion</h1>
+                <p className="text-lg text-slate-500 max-w-md mb-2">The first AI agent that blends Skin AI, Fabric Science & Apparel VTO.</p>
+                <p className="text-md text-slate-400 max-w-sm mb-10">Scan your skin barrier. Get an instant treatment plan. Shop fabrics that heal, not harm. Try them on instantly.</p>
+                <div className="flex gap-4">
+                    <button onClick={() => goTo('scan')} className="px-8 py-4 bg-emerald-700 text-white rounded-full font-semibold text-lg flex items-center gap-2 hover:bg-emerald-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                        <Icon path={paths.scan} className="w-5 h-5" /> Start AI Analysis
+                    </button>
+                    <button onClick={() => goTo('deconstruct')} className="px-8 py-4 bg-white text-slate-800 border border-slate-200 rounded-full font-semibold text-lg flex items-center gap-2 hover:bg-slate-50 transition-all">
+                        <Icon path={paths.image} className="w-5 h-5" /> Inspo AI
+                    </button>
+                </div>
+            </main>
+        );
+
+        // --- SCAN PAGE ---
+        const ScanPage = ({ goToDiagnosis, setSkinData }) => {
+            const videoRef = useRef(null);
+            const fileInputRef = useRef(null);
+            const [stream, setStream] = useState(null);
+            const [capturedImage, setCapturedImage] = useState(null);
+            const [isScanning, setIsScanning] = useState(false);
+
+            useEffect(() => {
+                let activeStream;
+                async function setupCamera() {
+                    try {
+                        activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                        setStream(activeStream);
+                        if (videoRef.current) videoRef.current.srcObject = activeStream;
+                    } catch (err) { console.log("Camera access denied"); }
+                }
+                setupCamera();
+                return () => { if (activeStream) activeStream.getTracks().forEach(track => track.stop()); };
+            }, []);
+
+            const capturePhoto = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoRef.current.videoWidth;
+                canvas.height = videoRef.current.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(videoRef.current, 0, 0);
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                setCapturedImage(dataUrl);
+                sendToBackend(dataUrl);
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => { setCapturedImage(reader.result); sendToBackend(reader.result); };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const sendToBackend = async (imageData) => {
+                setIsScanning(true);
+                const data = await mockAnalyzeSkinAPI();
+                setSkinData(data, imageData);
+                goToDiagnosis();
+            };
+
+            return (
+                <main className="min-h-[calc(100vh-5rem)] flex flex-col items-center justify-center p-4 relative fade-in">
+                    <h2 className="text-xl md:text-2xl font-bold mb-6 text-slate-800">Biometric Skin Scan</h2>
+                    <div className="relative w-full max-w-md aspect-square bg-slate-900 rounded-2xl overflow-hidden shadow-xl border-4 border-emerald-100">
+                        {!isScanning ? (
+                            <>
+                                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-3/4 h-3/4 border-4 border-emerald-400/50 rounded-full"></div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                                <img src={capturedImage} alt="Scanning" className="w-full h-full object-cover opacity-70" />
+                                <div className="absolute left-0 right-0 h-1 bg-emerald-400 scanline shadow-[0_0_20px_5px_rgba(52,211,153,0.8)]"></div>
+                                <div className="absolute bottom-10 flex flex-col items-center text-white">
+                                    <Icon path={paths.loader} className="w-8 h-8 animate-spin mb-2" />
+                                    <p>Analyzing Skin Barrier...</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {!isScanning && (
+                        <div className="mt-8 flex flex-col gap-4 w-full max-w-md">
+                            <button onClick={capturePhoto} className="w-full py-4 bg-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-emerald-800 transition-all">
+                                <Icon path={paths.camera} className="w-5 h-5" /> Capture & Analyze
+                            </button>
+                            <button onClick={() => fileInputRef.current.click()} className="w-full py-4 bg-white text-slate-700 border-2 border-slate-200 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all">
+                                <Icon path={paths.upload} className="w-5 h-5" /> Upload Selfie
+                            </button>
+                            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                        </div>
+                    )}
+                </main>
+            );
+        };
+
+        // --- DIAGNOSIS & TREATMENT PAGE ---
+        const DiagnosisPage = ({ goTo, skinData }) => {
+            if (!skinData) return null;
+            const { redness, texture, svs, gender } = skinData;
+
+            return (
+                <main className="min-h-[calc(100vh-5rem)] p-8 fade-in flex flex-col items-center">
+                    <div className="max-w-4xl w-full">
+                        <div className="flex items-center gap-3 mb-8">
+                            <Icon path={paths.brain} className="w-8 h-8 text-emerald-700" />
+                            <h2 className="text-2xl font-bold text-slate-800">AI Agent Diagnosis & Treatment</h2>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                                    <h3 className="font-bold text-red-800 mb-1">Compromised Skin Barrier Detected</h3>
+                                    <p className="text-sm text-red-700">SVS: <span className="font-bold">{svs}/100</span>. High friction fabrics will cause micro-tears.</p>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="flex justify-between mb-1"><span className="text-sm text-slate-500">Redness Index</span><span className="text-sm font-bold text-slate-800">{redness}%</span></div>
+                                        <div className="w-full bg-slate-200 h-2 rounded-full"><div className="bg-red-400 h-2 rounded-full" style={{width: `${redness}%`}}></div></div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between mb-1"><span className="text-sm text-slate-500">Texture Index</span><span className="text-sm font-bold text-slate-800">{texture}%</span></div>
+                                        <div className="w-full bg-slate-200 h-2 rounded-full"><div className="bg-orange-400 h-2 rounded-full" style={{width: `${texture}%`}}></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Icon path={paths.pill} className="w-6 h-6 text-emerald-700" />
+                                    <h3 className="font-bold text-slate-800">Prescribed Treatment Plan</h3>
+                                </div>
+                                <ul className="space-y-3 text-sm text-slate-600">
+                                    <li className="flex gap-2"><span className="font-bold text-emerald-700">1.</span> Use a ceramide-based moisturizer twice daily to rebuild barrier lipids.</li>
+                                    <li className="flex gap-2"><span className="font-bold text-emerald-700">2.</span> Apply Hypochlorous Acid spray to reduce inflammation and redness.</li>
+                                    <li className="flex gap-2"><span className="font-bold text-emerald-700">3.</span> Avoid physical exfoliants. Use a gentle, non-foaming cleanser.</li>
+                                    <li className="flex gap-2"><span className="font-bold text-emerald-700">4.</span> Wear only hypoallergenic fabrics (Silk, Bamboo, Cotton) for the next 14 days.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-8 text-center">
+                            <p className="text-sm text-emerald-800">Based on your {gender} skin profile, we have filtered your storefront to remove all irritants.</p>
+                        </div>
+
+                        <button onClick={() => goTo('shop')} className="w-full py-4 bg-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-emerald-800 transition-all">
+                            Shop Safe Fabrics <Icon path={paths.shield} className="w-5 h-5" />
+                        </button>
+                    </div>
+                </main>
+            );
+        };
+
+        // --- PRODUCT MODAL ---
+        const ProductModal = ({ item, skinData, onClose, onAddToCart, onTryOn }) => {
+            const [size, setSize] = useState('M');
+            if (!item) return null;
+            const isLocked = skinData?.isHighlyReactive && item.irritation_index > 50;
+
+            return (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 fade-in" onClick={onClose}>
+                    <div className="bg-white rounded-2xl max-w-3xl w-full grid grid-cols-1 md:grid-cols-2 overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="aspect-square bg-slate-100 relative">
+                            <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                            {isLocked && <div className="absolute inset-0 bg-white/60 flex flex-col items-center justify-center"><Icon path={paths.lock} className="w-12 h-12 text-red-500 mb-2" /><span className="text-red-500 font-bold">Not Safe for Your Skin</span></div>}
+                        </div>
+                        <div className="p-8 flex flex-col">
+                            <button onClick={onClose} className="self-end p-2 text-slate-400 hover:text-slate-800"><Icon path={paths.x} className="w-5 h-5" /></button>
+                            <h2 className="text-2xl font-bold text-slate-800 mb-1">{item.name}</h2>
+                            <p className="text-slate-500 mb-4">{item.fabric}</p>
+                            <p className="text-2xl font-bold text-slate-900 mb-6">${item.price}</p>
+                            
+                            <div className="mb-6">
+                                <p className="text-sm font-medium text-slate-700 mb-2">Select Size</p>
+                                <div className="flex gap-2">
+                                    {['XS', 'S', 'M', 'L', 'XL'].map(s => (
+                                        <button key={s} onClick={() => setSize(s)} className={`w-10 h-10 rounded-md border-2 font-medium ${size === s ? 'border-emerald-700 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600'}`}>{s}</button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-auto">
+                                <button onClick={() => onAddToCart(item, size)} disabled={isLocked} className={`flex-1 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${isLocked ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900'}`}>
+                                    <Icon path={paths.cart} className="w-5 h-5" /> Add to Cart
+                                </button>
+                                <button onClick={() => onTryOn(item)} disabled={isLocked} className={`flex-1 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${isLocked ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                                    <Icon path={paths.camera} className="w-5 h-5" /> Try On (VTO)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SHOP PAGE ---
+        const ShopPage = ({ goToVTO, skinData, addToCart, toggleWishlist, wishlist, openProductModal }) => {
+            const [catalog] = useState(mockCatalog);
+            const [activePreset, setActivePreset] = useState('all');
+            const [filters, setFilters] = useState({ breathable: false, seamless: false, noTags: false, noSynthetics: false });
+            
+            const { isHighlyReactive, gender } = skinData || {};
+            
+            let filteredCatalog = skinData ? catalog.filter(item => item.gender === gender || item.gender === 'unisex') : catalog;
+            if (activePreset !== 'all') filteredCatalog = filteredCatalog.filter(item => item.tags.includes(activePreset));
+            if (filters.breathable) filteredCatalog = filteredCatalog.filter(item => item.tags.includes("breathable"));
+            if (filters.seamless) filteredCatalog = filteredCatalog.filter(item => item.tags.includes("seamless"));
+
+            const presets = [
+                { id: 'all', name: 'All Safe Items' },
+                { id: 'sleep', name: 'Sleep & Recovery' },
+                { id: 'formal', name: 'Formal & Office' },
+                { id: 'breathable', name: 'Breathable' }
+            ];
+
+            const communityLookbook = [
+                "https://images.unsplash.com/photo-1485462537746-965f33f7f6a7?w=200&q=80",
+                "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=200&q=80",
+                "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=200&q=80",
+                "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=200&q=80"
+            ];
+
+            return (
+                <main className="min-h-[calc(100vh-5rem)] p-8 fade-in">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Personalized Storefront</h1>
+                                <p className="text-slate-500">{skinData ? `Filtered for ${gender} skin profile` : 'All available items'}</p>
+                            </div>
+                            {skinData && (
+                                <div className={`px-4 py-2 rounded-full font-bold text-white ${isHighlyReactive ? 'bg-red-400' : 'bg-emerald-700'}`}>
+                                    SVS: {skinData.svs} {isHighlyReactive && <span className="ml-2 text-xs">(Reactive)</span>}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                            {presets.map(p => (
+                                <button key={p.id} onClick={() => setActivePreset(p.id)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap border-2 transition-all ${activePreset === p.id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>
+                                    {p.name}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-8 flex flex-wrap gap-4 items-center">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Refine Canvas:</span>
+                            <div className="flex gap-2">
+                                <button onClick={() => setFilters({...filters, breathable: !filters.breathable})} className={`px-3 py-1 text-xs rounded-full border ${filters.breathable ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>+ Breathable</button>
+                                <button onClick={() => setFilters({...filters, seamless: !filters.seamless})} className={`px-3 py-1 text-xs rounded-full border ${filters.seamless ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>+ Seamless</button>
+                                <button className="px-3 py-1 text-xs rounded-full border bg-red-50 text-red-500 border-red-200 cursor-not-allowed">- Tags</button>
+                                <button className="px-3 py-1 text-xs rounded-full border bg-red-50 text-red-500 border-red-200 cursor-not-allowed">- Synthetics</button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
+                            {filteredCatalog.map((item) => {
+                                const isLocked = isHighlyReactive && item.irritation_index > 50;
+                                const isWishlisted = wishlist.includes(item.id);
+                                return (
+                                    <div key={item.id} className="relative rounded-2xl overflow-hidden shadow-sm border border-slate-100 bg-white transition-all duration-300 hover:shadow-lg">
+                                        <div className="aspect-square bg-slate-100 cursor-pointer relative" onClick={() => !isLocked && openProductModal(item)}>
+                                            <img src={item.image_url} alt={item.name} className={`w-full h-full object-cover transition-all ${isLocked ? 'grayscale opacity-60' : 'hover:scale-105'}`} />
+                                            <button onClick={(e) => { e.stopPropagation(); toggleWishlist(item.id); }} className="absolute top-2 left-2 p-2 bg-white/70 rounded-full hover:bg-white">
+                                                <Icon path={paths.heart} className={`w-4 h-4 ${isWishlisted ? 'text-red-500 fill-red-500' : 'text-slate-700'}`} />
+                                            </button>
+                                            {isLocked ? (
+                                                <div className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg">
+                                                    <Icon path={paths.lock} className="w-5 h-5" />
+                                                </div>
+                                            ) : (
+                                                <div className="absolute top-2 right-2 bg-emerald-700 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                                                    <Icon path={paths.shield} className="w-3 h-3" /> Safe
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="p-4">
+                                            <h3 className="font-bold text-slate-800">{item.name}</h3>
+                                            <p className="text-sm text-slate-500 mb-2">{item.fabric}</p>
+                                            <div className="flex justify-between items-center">
+                                                <p className="font-bold text-slate-900">${item.price}</p>
+                                                <button onClick={() => !isLocked && openProductModal(item)} className={`text-xs font-bold px-3 py-1 rounded-full ${isLocked ? 'bg-slate-200 text-slate-400' : 'bg-slate-800 text-white hover:bg-slate-900'}`}>
+                                                    {isLocked ? 'Locked' : 'Quick View'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="border-t border-slate-200 pt-8">
+                            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon path={paths.grid} className="w-5 h-5" /> Community Lookbook</h2>
+                            <p className="text-slate-500 text-sm mb-6">Real safe-fit styles from our DermaWeave community.</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {communityLookbook.map((img, i) => (
+                                    <div key={i} className="aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 cursor-pointer group relative">
+                                        <img src={img} alt="Community Style" className="w-full h-full object-cover group-hover:scale-105 transition-all" />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            );
+        };
+
+        // --- VTO PAGE ---
+        const VTOPage = ({ goToShop, selectedItem, skinData }) => {
+            const [vtoImages, setVtoImages] = useState([null, null, null, null]);
+            const [isLoading, setIsLoading] = useState(true);
+            const [selectedVariation, setSelectedVariation] = useState(0);
+
+            useEffect(() => {
+                async function fetchVTO() {
+                    await new Promise(r => setTimeout(r, 2000));
+                    const maleImgs = [
+                        "https://images.unsplash.com/photo-1620012253295-c15cc3e65df4?w=400&q=80",
+                        "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=400&q=80",
+                        "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=400&q=80",
+                        "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80"
+                    ];
+                    const femaleImgs = [
+                        "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=400&q=80",
+                        "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80",
+                        "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=400&q=80",
+                        "https://images.unsplash.com/photo-1620012253295-c15cc3e65df4?w=400&q=80"
+                    ];
+                    const imgs = skinData?.gender === 'male' ? maleImgs : femaleImgs;
+                    setVtoImages(imgs);
+                    setIsLoading(false);
+                }
+                fetchVTO();
+            }, []);
+
+            return (
+                <main className="min-h-[calc(100vh-5rem)] flex flex-col items-center justify-center p-8 fade-in">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl max-w-4xl w-full">
+                        <div className="flex justify-between items-center mb-6">
+                            <button onClick={goToShop} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium">
+                                <Icon path={paths.arrowLeft} className="w-4 h-4" /> Back to Shop
+                            </button>
+                            <h1 className="text-xl font-bold text-slate-800">Generative Virtual Try-On</h1>
+                        </div>
+                        <p className="text-slate-500 mb-8 text-center">{selectedItem?.name} | {selectedItem?.fabric} | 4 Safe Colorway Variations</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="relative w-full aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden flex items-center justify-center">
+                                {isLoading ? (
+                                    <div className="flex flex-col items-center text-slate-500">
+                                        <Icon path={paths.loader} className="w-12 h-12 animate-spin text-emerald-700 mb-4" />
+                                        <p>Generating {skinData?.gender || 'female'} model...</p>
+                                        <p className="text-xs text-slate-400">Applying {selectedItem?.fabric}</p>
+                                    </div>
+                                ) : (
+                                    <div className="relative w-full h-full fade-in">
+                                        <img src={vtoImages[selectedVariation]} alt="Virtual Try On" className="w-full h-full object-cover" />
+                                        <div className="absolute top-4 right-4 bg-emerald-700 text-white px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg">
+                                            <Icon path={paths.check} className="w-4 h-4" /> Perfect Fit
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                {[0, 1, 2, 3].map(i => (
+                                    <div key={i} onClick={() => !isLoading && setSelectedVariation(i)} className={`relative aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 cursor-pointer border-4 ${selectedVariation === i ? 'border-emerald-700' : 'border-transparent'}`}>
+                                        {isLoading ? (
+                                            <div className="w-full h-full flex items-center justify-center bg-slate-200"><Icon path={paths.loader} className="w-8 h-8 animate-spin text-slate-400" /></div>
+                                        ) : (
+                                            <img src={vtoImages[i]} alt={`Variation ${i+1}`} className="w-full h-full object-cover" />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            );
+        };
+
+        // --- DECONSTRUCTOR PAGE ---
+        const DeconstructorPage = ({ goToShop }) => {
+            const [uploadedImage, setUploadedImage] = useState(null);
+            const [analyzing, setAnalyzing] = useState(false);
+            const [result, setResult] = useState(null);
+            const fileInputRef = useRef(null);
+
+            const handleUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setUploadedImage(reader.result);
+                        setAnalyzing(true);
+                        setTimeout(() => {
+                            setResult({
+                                detectedFabric: "Heavy Wool / Synthetic Blend",
+                                safetyScore: 85,
+                                isSafe: false,
+                                reason: "High friction fibers detected. Likely to cause micro-tears on compromised skin barriers.",
+                                alternativeId: 1
+                            });
+                            setAnalyzing(false);
+                        }, 2500);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            return (
+                <main className="min-h-[calc(100vh-5rem)] p-8 fade-in flex flex-col items-center">
+                    <div className="max-w-2xl w-full">
+                        <div className="flex items-center gap-3 mb-2">
+                            <Icon path={paths.image} className="w-8 h-8 text-emerald-700" />
+                            <h2 className="text-2xl font-bold text-slate-800">Inspo AI Deconstructor</h2>
+                        </div>
+                        <p className="text-slate-500 mb-8">Upload a photo of an outfit you love. Our AI will analyze the fabric structure, predict its irritation risk, and find a safe DermaWeave alternative.</p>
+
+                        {!uploadedImage && (
+                            <div onClick={() => fileInputRef.current.click()} className="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center cursor-pointer hover:bg-slate-50 hover:border-emerald-400 transition-all">
+                                <Icon path={paths.upload} className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                                <p className="font-medium text-slate-700">Click to upload an outfit photo</p>
+                                <p className="text-xs text-slate-400 mt-1">PNG, JPG up to 10MB</p>
+                                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleUpload} className="hidden" />
+                            </div>
+                        )}
+
+                        {uploadedImage && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100">
+                                    <img src={uploadedImage} alt="Inspo" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                                    {analyzing ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                                            <Icon path={paths.loader} className="w-10 h-10 animate-spin text-emerald-700 mb-4" />
+                                            <p>Deconstructing fabric weave...</p>
+                                        </div>
+                                    ) : result && (
+                                        <div className="fade-in">
+                                            <div className={`border rounded-xl p-4 mb-4 ${result.isSafe ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                                <h3 className={`font-bold mb-1 ${result.isSafe ? 'text-emerald-800' : 'text-red-800'}`}>{result.isSafe ? 'Safe Fabric Detected' : 'High Irritation Risk'}</h3>
+                                                <p className={`text-sm ${result.isSafe ? 'text-emerald-700' : 'text-red-700'}`}>{result.reason}</p>
+                                            </div>
+                                            <div className="mb-4">
+                                                <p className="text-sm text-slate-500">Detected Fabric:</p>
+                                                <p className="font-bold text-slate-800">{result.detectedFabric}</p>
+                                            </div>
+                                            <div className="mb-6">
+                                                <p className="text-sm text-slate-500">Irritation Index:</p>
+                                                <div className="w-full bg-slate-200 h-2 rounded-full mt-1"><div className="bg-red-400 h-2 rounded-full" style={{width: `${result.safetyScore}%`}}></div></div>
+                                            </div>
+                                            <button onClick={goToShop} className="w-full py-3 bg-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-emerald-800 transition-all">
+                                                Find Safe Alternatives <Icon path={paths.arrowLeft} className="w-5 h-5 rotate-180" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            );
+        };
+
+        // --- CART PAGE ---
+        const CartPage = ({ goTo, cart, removeFromCart }) => (
+            <main className="min-h-[calc(100vh-5rem)] p-8 fade-in">
+                <div className="max-w-4xl mx-auto">
+                    <h1 className="text-2xl font-bold text-slate-800 mb-8">Your Cart</h1>
+                    {cart.length === 0 ? (
+                        <div className="text-center py-20">
+                            <Icon path={paths.cart} className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                            <p className="text-slate-500 mb-4">Your cart is empty.</p>
+                            <button onClick={() => goTo('shop')} className="px-6 py-3 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800">Shop Now</button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {cart.map((item, index) => (
+                                <div key={index} className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                    <img src={item.image_url} alt={item.name} className="w-20 h-20 object-cover rounded-lg" />
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-slate-800">{item.name}</h3>
+                                        <p className="text-sm text-slate-500">Size: {item.size} | {item.fabric}</p>
+                                    </div>
+                                    <p className="font-bold text-slate-900">${item.price}</p>
+                                    <button onClick={() => removeFromCart(index)} className="text-slate-400 hover:text-red-500"><Icon path={paths.x} className="w-5 h-5" /></button>
+                                </div>
+                            ))}
+                            <div className="border-t border-slate-200 pt-4 mt-6 flex justify-between items-center">
+                                <span className="text-lg font-bold text-slate-800">Total: ${cart.reduce((sum, item) => sum + item.price, 0)}</span>
+                                <button className="px-8 py-3 bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-900">Checkout</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </main>
+        );
+
+        // --- MAIN APP ---
+        function App() {
+            const [page, setPage] = useState('landing');
+            const [selfieImage, setSelfieImage] = useState(null);
+            const [skinData, setSkinData] = useState(null);
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [modalItem, setModalItem] = useState(null);
+            const [cart, setCart] = useState([]);
+            const [wishlist, setWishlist] = useState([]);
+
+            const handleSetSkinData = (data, img) => { setSkinData(data); setSelfieImage(img); };
+            const addToCart = (item, size) => { setCart([...cart, { ...item, size }]); setModalItem(null); setPage('cart'); };
+            const removeFromCart = (index) => { setCart(cart.filter((_, i) => i !== index)); };
+            const toggleWishlist = (id) => { setWishlist(wishlist.includes(id) ? wishlist.filter(w => w !== id) : [...wishlist, id]); };
+
+            return (
+                <div className="min-h-screen bg-slate-50">
+                    <Navbar goTo={setPage} cartCount={cart.length} currentPage={page} />
+                    
+                    {page === 'landing' && <LandingPage goTo={setPage} />}
+                    {page === 'scan' && <ScanPage goToDiagnosis={() => setPage('diagnosis')} setSkinData={handleSetSkinData} />}
+                    {page === 'diagnosis' && <DiagnosisPage goTo={setPage} skinData={skinData} />}
+                    {page === 'shop' && <ShopPage 
+                                            goToVTO={(item) => { setSelectedItem(item); setPage('vto'); }} 
+                                            skinData={skinData} 
+                                            addToCart={addToCart}
+                                            toggleWishlist={toggleWishlist}
+                                            wishlist={wishlist}
+                                            openProductModal={(item) => setModalItem(item)}
+                                         />}
+                    {page === 'vto' && <VTOPage goToShop={() => setPage('shop')} selectedItem={selectedItem} skinData={skinData} />}
+                    {page === 'deconstruct' && <DeconstructorPage goToShop={() => setPage('shop')} />}
+                    {page === 'cart' && <CartPage goTo={setPage} cart={cart} removeFromCart={removeFromCart} />}
+
+                    {modalItem && <ProductModal 
+                                    item={modalItem} 
+                                    skinData={skinData} 
+                                    onClose={() => setModalItem(null)} 
+                                    onAddToCart={addToCart}
+                                    onTryOn={(item) => { setModalItem(null); setSelectedItem(item); setPage('vto'); }}
+                                  />}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
